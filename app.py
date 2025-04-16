@@ -4,9 +4,15 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import re
 import pandas as pd
+from streamlit_autorefresh import st_autorefresh
 
+# -------------------- CONFIG --------------------
 st.set_page_config(page_title="IPL Score Stream", layout="centered")
 
+# 🔄 Auto-refresh every 5 seconds
+st_autorefresh(interval=5000, limit=None, key="ipl_autorefresh")
+
+# -------------------- CONSTANTS --------------------
 BASE_URL = "https://www.cricbuzz.com"
 current_year = datetime.now().year
 
@@ -18,6 +24,7 @@ IPL_TEAMS_MAP = {
 }
 IPL_TEAMS = set(IPL_TEAMS_MAP.keys()) | set(IPL_TEAMS_MAP.values())
 
+# -------------------- FETCH LIVE MATCHES --------------------
 def fetch_live_ipl_matches():
     url = f"{BASE_URL}/cricket-match/live-scores"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -49,7 +56,6 @@ def fetch_live_ipl_matches():
         team1_score = score_blocks[0].text.strip() if len(score_blocks) > 0 else "N/A"
         team2_score = score_blocks[1].text.strip() if len(score_blocks) > 1 else "N/A"
 
-        # ✅ Skip invalid matches
         if "N/A" in team1_score or "N/A" in team2_score:
             continue
 
@@ -76,13 +82,13 @@ def fetch_live_ipl_matches():
         })
         valid_count += 1
 
-    # Check if any match is still live (based on commentary)
     live_matches = [
         r for r in results
         if re.search(r"needs\s+\d+\s+runs", r["Latest Commentary"].lower())
     ]
     return live_matches, results
 
+# -------------------- FETCH RECENT MATCHES --------------------
 def get_recent_results():
     url = f"{BASE_URL}/cricket-series/9237/Indian-Premier-League-{current_year}/matches"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -113,11 +119,16 @@ def get_recent_results():
 
     return results[:20]
 
+# -------------------- FETCH & DISPLAY --------------------
+live_matches, last_two_matches = fetch_live_ipl_matches()
+recent_results = get_recent_results()
+
+# -------------------- UI --------------------
 st.title("🏏 IPL Score Stream")
+st.markdown(f"⏱️ Last updated: {datetime.now().strftime('%H:%M:%S')}")
 st.markdown("---")
 
-# LIVE
-live_matches, last_two_matches = fetch_live_ipl_matches()
+# LIVE MATCHES
 if live_matches:
     st.subheader("🟢 Live Match Score")
     df = pd.DataFrame(live_matches)
@@ -138,7 +149,6 @@ if last_two_matches:
 st.markdown("---")
 
 # WON MATCHES
-recent_results = get_recent_results()
 won_matches = [r for r in recent_results if "won by" in r.lower()]
 if won_matches:
     st.subheader("✅ Won Matches")
