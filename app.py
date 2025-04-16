@@ -1,124 +1,151 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
 from datetime import datetime
+import re
+import pandas as pd
 
-# Set page config FIRST
-st.set_page_config(page_title="🏏 IPL Score Stream", layout="centered")
+# -------------------- CONFIG --------------------
+st.set_page_config(page_title="IPL Score Stream", layout="centered")
 
-# Base settings
+# -------------------- CONSTANTS --------------------
 BASE_URL = "https://www.cricbuzz.com"
 current_year = datetime.now().year
 
+IPL_TEAMS_MAP = {
+    "CSK": "Chennai Super Kings", "DC": "Delhi Capitals", "GT": "Gujarat Titans",
+    "KKR": "Kolkata Knight Riders", "LSG": "Lucknow Super Giants", "MI": "Mumbai Indians",
+    "PBKS": "Punjab Kings", "RR": "Rajasthan Royals", "RCB": "Royal Challengers Bangalore",
+    "SRH": "Sunrisers Hyderabad"
+}
+IPL_TEAMS = set(IPL_TEAMS_MAP.keys()) | set(IPL_TEAMS_MAP.values())
+
 # -------------------- LIVE MATCHES --------------------
-@st.cache_data(ttl=60)
 def fetch_live_ipl_matches():
     url = f"{BASE_URL}/cricket-match/live-scores"
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, "html.parser")
 
-    matches = []
-    sections = soup.find_all("div", class_="cb-col cb-col-100 cb-plyr-tbody cb-rank-hdr cb-lv-main")
+    pattern = re.compile(fr"/live-cricket-scores/.+-match-indian-premier-league-{current_year}")
+    matches = [a['href'] for a in soup.find_all('a', href=True) if pattern.search(a['href'])]
+    pattern_4_score = re.compile(r'(\d+)(?:th|st|nd|rd)-match')
 
-    for section in sections:
-        header = section.find("h2", class_="cb-lv-grn-strip")
-        if not header or not header.find("span", class_="cb-plus-ico cb-ico-live-stream"):
+    final_matches = sorted(
+        [(link, int(pattern_4_score.search(link).group(1))) for link in matches if pattern_4_score.search(link)],
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    results = []
+    seen = set()
+
+    for match_url, _ in final_matches[:2]:
+        response = requests.get(BASE_URL + match_url, headers=headers)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        score_blocks = soup.select("div.cb-col.cb-col-100.cb-min-tm")
+        team1_score = score_blocks[0].text.strip() if len(score_blocks) > 0 else "N/A"
+        team2_score = score_blocks[1].text.strip() if len(score_blocks) > 1 else "N/A"
+
+        result_block = soup.select_one("div.cb-min-stts")
+        result = result_block.text.strip() if result_block else "Result unavailable"
+
+        mom_block = soup.select_one("div.cb-mom-itm a.cb-link-undrln")
+        mom = mom_block.text.strip() if mom_block else "Unknown"
+
+        commentary_blocks = soup.find_all("p", class_="cb-com-ln", limit=3)
+        commentary = " ".join(c.get_text(strip=True) for c in commentary_blocks)
+
+        match_id = f"{team1_score}|{team2_score}|{result}"
+        if match_id in seen:
+            continue
+        seen.add(match_id)
+
+        results.append({
+            "1st Team Score": team1_score,
+            "2nd Team Score": team2_score,
+            "Result": result,
+            "Player of the Match": mom,
+            "Latest Commentary": commentary[:100]
+        })
+
+    # Check if any commentary mentions "needs X runs" (indicates it's still live)
+    live_matches = [
+        r for r in results
+        if re.search(r"needs\s+\d+\s+runs", r["Latest Commentary"].lower())
+    ]
+    return live_matches, results
+
+# -------------------- RECENT MATCHES --------------------
+def get_recent_results():
+    url = f"{BASE_URL}/cricket-series/9237/Indian-Premier-League-{current_year}/matches"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    all_tags = soup.find_all("a", href=True)
+    results, seen = [], set()
+
+    for i in range(len(all_tags) - 1):
+        tag, next_tag = all_tags[i], all_tags[i + 1]
+        href = tag['href']
+        title = tag.get_text().strip()
+        result = next_tag.get_text().strip()
+
+        if "cricket-scores" not in href:
             continue
 
-        blocks = section.find_all("div", class_="cb-mtch-lst")
-        for block in blocks:
-            title = block.find("h3", class_="cb-lv-scr-mtch-hdr")
-            title_text = title.get_text(strip=True).rstrip(',') if title else "N/A"
+        if not any(team.lower() in title.lower() for team in IPL_TEAMS):
+            continue
 
-            # Team 1 score
-            team1 = block.find("div", class_="cb-hmscg-bwl-txt")
-            team1_score = team1.find_all("div", class_="cb-ovr-flo")[1].text.strip() if team1 and len(team1.find_all("div", class_="cb-ovr-flo")) > 1 else "N/A"
+        match_id = f"{title}-{result}"
+        if match_id in seen:
+            continue
+        seen.add(match_id)
 
-            # Team 2 score
-            team2 = block.find("div", class_="cb-hmscg-bat-txt")
-            team2_score = team2.find_all("div", class_="cb-ovr-flo")[1].text.strip() if team2 and len(team2.find_all("div", class_="cb-ovr-flo")) > 1 else "N/A"
+        results.append(f"{title} – {result}")
 
-            # Commentary
-            status = block.find("div", class_="cb-text-live")
-            status_text = status.text.strip() if status else "Live match ongoing"
+    return results[:20]
 
-            # Check if match is truly live (commentary says "needs X runs")
-            if "need" not in status_text.lower():
-                continue  # Not live
-
-            matches.append({
-                "Match Title": title_text,
-                "Batting Side Score": team2_score,
-                "Bowling Side Score": team1_score,
-                "Status": status_text
-            })
-
-    return matches
-
-# -------------------- RECENT RESULTS --------------------
-@st.cache_data(ttl=600)
-def get_recent_results():
-    try:
-        url = f"{BASE_URL}/cricket-series/9237/Indian-Premier-League-{current_year}/matches"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, "html.parser")
-        all_tags = soup.find_all("a", href=True)
-
-        results, seen = [], set()
-        for i in range(len(all_tags) - 1):
-            tag, next_tag = all_tags[i], all_tags[i + 1]
-            href, title, result = tag['href'], tag.get_text(strip=True), next_tag.get_text(strip=True)
-
-            if "cricket-scores" in href:
-                match_id = f"{title}-{result}"
-                if match_id not in seen:
-                    seen.add(match_id)
-                    results.append(f"{title} – {result}")
-
-        return results[:10]
-    except Exception:
-        return ["Error loading past matches."]
-
-# -------------------- UI START --------------------
+# -------------------- UI --------------------
 st.title("🏏 IPL Score Stream")
-st.markdown("—")
+st.markdown("---")
 
-# 🔴 Live Section
-st.subheader("🟢 Live Matches")
-live_scores = fetch_live_ipl_matches()
-
-if live_scores:
-    for match in live_scores:
-        st.markdown(f"#### 🔥 {match['Match Title']}")
-        st.markdown(f"✍️ **Batting Side Score**: {match['Batting Side Score']}")
-        st.markdown(f"🧤 **Bowling Side Score**: {match['Bowling Side Score']}")
-        st.markdown(f"📣 **Status**: {match['Status']}")
-        st.markdown("---")
-else:
-    st.warning("✅ No live IPL matches right now. All matches have ended or haven't started.")
-
-# 📊 Last 2 Match Summary
-if live_scores:
-    st.subheader("🧾 Last 2 Matches Summary")
-    df = pd.DataFrame(live_scores[:2])
+# LIVE
+live_matches, last_two_matches = fetch_live_ipl_matches()
+if live_matches:
+    st.subheader("🟢 Live Match Score")
+    df = pd.DataFrame(live_matches)
     df.index += 1
     st.table(df)
-    st.markdown("---")
+else:
+    st.warning("❌ No live IPL matches currently.")
 
-# 📋 Results
+st.markdown("---")
+
+# LAST 2 MATCHES
+if last_two_matches:
+    st.subheader("📊 Past 2 Matches")
+    df2 = pd.DataFrame(last_two_matches)
+    df2.index += 1
+    st.table(df2)
+
+st.markdown("---")
+
+# WON MATCHES
 recent_results = get_recent_results()
-if recent_results:
-    won_matches = [r for r in recent_results if "won" in r.lower()]
+won_matches = [r for r in recent_results if "won by" in r.lower()]
+if won_matches:
     st.subheader("✅ Won Matches")
-    for result in won_matches:
-        st.markdown(f"- {result}")
+    for win in won_matches:
+        st.markdown(f"- {win}")
     st.markdown("---")
 
-    st.subheader("📋 All Recent Results")
-    for result in recent_results:
-        st.markdown(f"- {result}")
+# ALL RESULTS
+if recent_results:
+    st.subheader("📋 All Recent IPL Results")
+    for res in recent_results:
+        st.markdown(f"- {res}")
 else:
     st.warning("❌ No recent results found.")
