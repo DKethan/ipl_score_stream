@@ -109,12 +109,6 @@ else:
     st.warning("❌ No live IPL matches currently.")
     st.markdown("---")
 
-st.subheader("📰 Latest IPL News")
-for title, link in get_recent_news():
-    st.markdown(f"- [{title}]({link})")
-
-st.divider()
-
 
 st.subheader("📅 Recent Match Results")
 for _, desc, link in get_recent_match_results():
@@ -124,3 +118,10 @@ st.divider()
 st.subheader("🗓️ Upcoming Matches")
 for line in get_upcoming_matches():
     st.markdown(line)
+
+st.divider()
+
+st.subheader("📰 Latest IPL News")
+for title, link in get_recent_news():
+    st.markdown(f"- [{title}]({link})")
+
