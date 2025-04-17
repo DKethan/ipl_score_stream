@@ -113,6 +113,9 @@ st.subheader("📰 Latest IPL News")
 for title, link in get_recent_news():
     st.markdown(f"- [{title}]({link})")
 
+st.divider()
+
+
 st.subheader("📅 Recent Match Results")
 for _, desc, link in get_recent_match_results():
     st.markdown(f"- [{desc}]({link})")
