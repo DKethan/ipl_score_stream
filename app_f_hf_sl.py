@@ -4,13 +4,10 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 
-# -------------------- PAGE CONFIG (must be first) --------------------
 st.set_page_config(page_title="IPL Score Stream", layout="centered")
 
-# -------------------- AUTO REFRESH --------------------
 st_autorefresh(interval=5000, limit=None, key="ipl_autorefresh")
 
-# -------------------- CONSTANTS --------------------
 CURRENT_YEAR = datetime.now().year
 YEAR_CODE_MAPPING = {2025: "9237"}
 YEAR_CODE = YEAR_CODE_MAPPING.get(CURRENT_YEAR, "default_code")
