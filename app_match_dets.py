@@ -4,38 +4,41 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 
-# Dynamically get the current year
-CURRENT_YEAR = datetime.now().year
-
-# Define the unique code for the year (e.g., 2025 -> 9237)
-YEAR_CODE_MAPPING = {
-    2025: "9237",
-}
-
-# Get the unique code for the current year
-YEAR_CODE = YEAR_CODE_MAPPING.get(CURRENT_YEAR, "default_code")
-
-# Construct URLs
+# -------------------- Constants --------------------
 BASE_URL = "https://www.cricbuzz.com"
-IPL_SERIES_URL = f"{BASE_URL}/cricket-series/{YEAR_CODE}/indian-premier-league-{CURRENT_YEAR}"
+IPL_SERIES_URL = f"{BASE_URL}/cricket-series/9237/indian-premier-league-2025"
 IPL_MATCHES_URL = f"{IPL_SERIES_URL}/matches"
 LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to"]
 
-st.markdown("""
+# -------------------- Custom Layout Fix (Full Width) --------------------
+st.markdown(
+    """
     <style>
-        .main > div { max-width: 100%; padding-left: 1rem; padding-right: 1rem; }
+        .main > div {
+            max-width: 100%;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
-st.markdown(f"""
+# -------------------- Centered Title --------------------
+st.markdown(
+    f"""
     <h1 style='text-align: center;'>🏏 IPL Score Stream</h1>
     <p style='text-align: center; font-size: 16px; color: gray;'>
         ⏱️ Last updated: {datetime.now().strftime('%H:%M:%S')}
     </p>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
+# -------------------- Auto Refresh --------------------
 st_autorefresh(interval=5000, limit=None, key="ipl_autorefresh")
 
+# -------------------- Live Matches Scraper --------------------
 def fetch_live_ipl_matches():
     url = f"{BASE_URL}/cricket-match/live-scores"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -71,48 +74,35 @@ def fetch_live_ipl_matches():
                 })
     return live_matches
 
+# -------------------- Recent News --------------------
 def get_recent_news():
     headers = {"User-Agent": "Mozilla/5.0"}
     soup = BeautifulSoup(requests.get(IPL_SERIES_URL, headers=headers).text, "html.parser")
     tags = soup.find_all("a", class_="cb-nws-hdln-ancr")
     return [(tag.text.strip(), BASE_URL + tag["href"]) for tag in tags[:10]]
 
+# -------------------- Match Results (Last 5) --------------------
 def get_recent_match_results():
     headers = {"User-Agent": "Mozilla/5.0"}
     soup = BeautifulSoup(requests.get(IPL_MATCHES_URL, headers=headers).text, "html.parser")
-    result_blocks = soup.find_all("a", href=True)
 
+    result_blocks = soup.find_all("a", href=True)
     results = []
+
     for tag in result_blocks:
         if "won by" in tag.text.lower():
             desc = tag.text.strip()
             link = BASE_URL + tag["href"]
+
             parent = tag.find_parent("div", class_="cb-col-100 cb-col")
             date_tag = parent.find("div", class_="schedule-date") if parent else None
             date = date_tag.text.strip() if date_tag else "—"
+
             results.append((date, desc, link))
 
-    return results[-5:][::-1] if results else []
+    return results[-5:] if results else []
 
-def get_upcoming_matches():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    soup = BeautifulSoup(requests.get(IPL_MATCHES_URL, headers=headers).text, "html.parser")
-    matches = []
-
-    for block in soup.select("div.cb-series-matches"):
-        title_tag = block.select_one("a.text-hvr-underline")
-        venue_tag = block.select_one("div.text-gray")
-        time_tag = block.select_one("a.cb-text-upcoming")
-
-        if title_tag and venue_tag and time_tag:
-            title = title_tag.text.strip()
-            venue = venue_tag.text.strip()
-            start = time_tag.text.strip()
-            link = BASE_URL + title_tag["href"]
-            matches.append(f"- [{title} at {venue}]({link})")
-
-    return matches[:5]
-
+# -------------------- LEFT PANEL --------------------
 def left_panel():
     st.subheader("🟢 Live Matches")
     matches = fetch_live_ipl_matches()
@@ -125,22 +115,31 @@ def left_panel():
             st.markdown("---")
     else:
         st.warning("❌ No live IPL matches currently.")
-        st.markdown("---")
 
+    # News
     st.subheader("📰 Latest IPL News")
-    for title, link in get_recent_news():
-        st.markdown(f"- [{title}]({link})")
+    news = get_recent_news()
+    if news:
+        for title, link in news:
+            st.markdown(f"- [{title}]({link})")
+    else:
+        st.info("No news found.")
 
+# -------------------- RIGHT PANEL --------------------
 def right_panel():
     st.subheader("📅 Recent Match Results")
-    for _, desc, link in get_recent_match_results():
-        st.markdown(f"- [{desc}]({link})")
+    results = get_recent_match_results()
+    if results:
+        for _, desc, url in results:
+            st.markdown(f"- [{desc}]({url})")
+    else:
+        st.info("No match results found.")
 
-    st.divider()
-    st.subheader("🗓️ Upcoming Matches")
-    for line in get_upcoming_matches():
-        st.markdown(line)
-
+# -------------------- Layout --------------------
 left_col, right_col = st.columns([5, 5])
-with left_col: left_panel()
-with right_col: right_panel()
+
+with left_col:
+    left_panel()
+
+with right_col:
+    right_panel()
