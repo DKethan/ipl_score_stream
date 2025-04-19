@@ -12,7 +12,7 @@ st_autorefresh(interval=5000, limit=None, key="ipl_autorefresh")
 
 BASE_URL = "https://www.cricbuzz.com"
 IPL_SERIES_URL = f"{BASE_URL}/cricket-series/9237/indian-premier-league-2025"
-LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to"]
+LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to", "innings", "innings Break"]
 
 # -------------------- LIVE IPL FUNCTION --------------------
 def fetch_live_ipl_matches():

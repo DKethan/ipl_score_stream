@@ -19,7 +19,8 @@ YEAR_CODE = YEAR_CODE_MAPPING.get(CURRENT_YEAR, "default_code")
 BASE_URL = "https://www.cricbuzz.com"
 IPL_SERIES_URL = f"{BASE_URL}/cricket-series/{YEAR_CODE}/indian-premier-league-{CURRENT_YEAR}"
 IPL_MATCHES_URL = f"{IPL_SERIES_URL}/matches"
-LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to"]
+LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to", "innings", "innings Break"]
+
 
 st.markdown("""
     <style>
