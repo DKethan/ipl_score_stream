@@ -8,13 +8,20 @@ st.set_page_config(page_title="IPL Score Stream", layout="centered")
 
 st_autorefresh(interval=5000, limit=None, key="ipl_autorefresh")
 
+st.markdown(f"""
+    <h1 style='text-align: center;'>🏏 IPL Score Stream</h1>
+    <p style='text-align: center; font-size: 16px; color: gray;'>
+        ⏱️ Last updated: {datetime.now().strftime('%H:%M:%S')}
+    </p>
+""", unsafe_allow_html=True)
+
 CURRENT_YEAR = datetime.now().year
 YEAR_CODE_MAPPING = {2025: "9237"}
 YEAR_CODE = YEAR_CODE_MAPPING.get(CURRENT_YEAR, "default_code")
 BASE_URL = "https://www.cricbuzz.com"
 IPL_SERIES_URL = f"{BASE_URL}/cricket-series/{YEAR_CODE}/indian-premier-league-{CURRENT_YEAR}"
 IPL_MATCHES_URL = f"{IPL_SERIES_URL}/matches"
-LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to"]
+LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to", "innings", "innings Break"]
 
 def fetch_live_ipl_matches():
     url = f"{BASE_URL}/cricket-match/live-scores"
