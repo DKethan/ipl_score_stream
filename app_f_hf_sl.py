@@ -21,7 +21,7 @@ YEAR_CODE = YEAR_CODE_MAPPING.get(CURRENT_YEAR, "default_code")
 BASE_URL = "https://www.cricbuzz.com"
 IPL_SERIES_URL = f"{BASE_URL}/cricket-series/{YEAR_CODE}/indian-premier-league-{CURRENT_YEAR}"
 IPL_MATCHES_URL = f"{IPL_SERIES_URL}/matches"
-LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to", "innings", "innings Break"]
+LIVE_KEYWORDS = ["won the toss", "opt", "elect", "need", "needs", "chose to", "innings", "innings Break", "strategic timeout" ]
 
 def fetch_live_ipl_matches():
     url = f"{BASE_URL}/cricket-match/live-scores"
